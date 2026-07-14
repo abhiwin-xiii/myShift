@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3f5fa">
+<title>MyShift</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MyShift">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">MyShift</div>
+    <p class="hint" style="margin-top:0">Sign in to sync your shifts to the cloud across devices.</p>
+    <form id="authForm" class="form">
+      <label>Email
+        <input type="email" id="authEmail" required autocomplete="email">
+      </label>
+      <label>Password
+        <input type="password" id="authPassword" required autocomplete="current-password" minlength="6">
+      </label>
+      <div id="authError" class="auth-error" hidden></div>
+      <button type="submit" class="btn-primary" id="authSubmitBtn">Sign In</button>
+    </form>
+    <button type="button" class="btn-secondary" id="authToggleBtn" style="margin-top:10px;">Need an account? Sign Up</button>
+  </div>
+</div>
+
+<header class="topbar" id="topbar">
+  <div class="topbar-title" id="pageTitle">Dashboard</div>
+  <button class="topbar-signout" id="signOutBtn" hidden>Sign out</button>
+</header>
+
+<main id="app">
+
+  <!-- DASHBOARD -->
+  <section id="view-dashboard" class="view active">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Earned This Week</div>
+        <div class="stat-value" id="statWeekEarnings">€0.00</div>
+        <div class="stat-sub" id="statWeekHours">0 hrs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Earned This Month</div>
+        <div class="stat-value" id="statMonthEarnings">€0.00</div>
+        <div class="stat-sub" id="statMonthHours">0 hrs</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h2>Upcoming Shifts</h2>
+    </div>
+    <div id="upcomingList" class="card-list empty">No upcoming shifts yet.</div>
+
+    <div class="section-header">
+      <h2>Recent Shifts</h2>
+    </div>
+    <div id="recentList" class="card-list empty">No shifts logged yet.</div>
+
+    <button class="fab" id="fabAddShift">+</button>
+  </section>
+
+  <!-- SHIFTS -->
+  <section id="view-shifts" class="view">
+    <div class="tabs-inline">
+      <button class="chip active" data-filter="upcoming">Upcoming</button>
+      <button class="chip" data-filter="past">Past</button>
+      <button class="chip" data-filter="all">All</button>
+    </div>
+    <div id="shiftsList" class="card-list empty">No shifts yet. Tap + to add one.</div>
+    <button class="fab" id="fabAddShift2">+</button>
+  </section>
+
+  <!-- OPEN SHIFTS -->
+  <section id="view-open" class="view">
+    <p class="hint" style="margin-top:0">Add shifts you're considering picking up — we'll check them against your schedule, days off, and gap time.</p>
+    <div id="openList" class="card-list empty">No open shifts added yet. Tap + to check one.</div>
+    <button class="fab" id="fabAddOpen">+</button>
+  </section>
+
+  <!-- CALENDAR -->
+  <section id="view-calendar" class="view">
+    <div class="cal-header">
+      <button type="button" id="calPrevBtn" class="cal-nav-btn" aria-label="Previous month">&lsaquo;</button>
+      <div class="cal-title" id="calTitle">Month Year</div>
+      <button type="button" id="calNextBtn" class="cal-nav-btn" aria-label="Next month">&rsaquo;</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <span><i class="cal-dot cal-dot-green"></i>Shift scheduled</span>
+      <span><i class="cal-dot cal-dot-orange"></i>Open shift candidate</span>
+      <span><i class="cal-dot cal-dot-red"></i>Day off</span>
+      <span><i class="cal-dot cal-dot-white"></i>Free</span>
+    </div>
+  </section>
+
+  <!-- PAYMENTS -->
+  <section id="view-payments" class="view">
+    <div class="stat-card status-amber" style="margin-bottom:14px;">
+      <div class="stat-label">Pending (worked, not yet paid)</div>
+      <div class="stat-value" id="statPending">€0.00</div>
+      <div class="stat-sub" id="statPendingSub">0 shifts</div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Expected This Month</div>
+        <div class="stat-value" id="statExpectedMonth">€0.00</div>
+        <div class="stat-sub" id="statExpectedMonthSub">0 shifts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Credited This Month</div>
+        <div class="stat-value" id="statCreditedMonth">€0.00</div>
+        <div class="stat-sub" id="statCreditedMonthSub">0 shifts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Earned This Week</div>
+        <div class="stat-value" id="statPayWeekEarnings">€0.00</div>
+        <div class="stat-sub" id="statPayWeekHours">0 hrs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Earned This Month</div>
+        <div class="stat-value" id="statPayMonthEarnings">€0.00</div>
+        <div class="stat-sub" id="statPayMonthHours">0 hrs</div>
+      </div>
+    </div>
+
+    <div class="section-header"><h2>Expected to Be Credited: This Week</h2></div>
+    <div class="stat-card" style="margin-bottom:10px;">
+      <div class="stat-label">To Be Credited</div>
+      <div class="stat-value" id="statCreditedWeek">€0.00</div>
+      <div class="stat-sub" id="statCreditedWeekSub">0 shifts</div>
+    </div>
+    <p class="hint" style="margin-top:0">Money landing in your account this week — not the same as what you earned this week.</p>
+    <div id="paydayList" class="card-list empty">No upcoming pay dates yet.</div>
+
+    <div class="section-header"><h2>Shifts by Payment Status</h2></div>
+    <div class="tabs-inline">
+      <button class="chip active" data-payfilter="pending">Pending</button>
+      <button class="chip" data-payfilter="scheduled">Scheduled</button>
+      <button class="chip" data-payfilter="paid">Paid</button>
+    </div>
+    <div id="paymentShiftsList" class="card-list empty">Nothing here.</div>
+  </section>
+
+  <!-- EMPLOYERS -->
+  <section id="view-employers" class="view">
+    <div id="employersList" class="card-list empty">No employers yet. Tap + to add one.</div>
+    <button class="fab" id="fabAddEmployer">+</button>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view">
+    <form id="settingsForm" class="form">
+      <label>Currency symbol
+        <input type="text" id="setCurrency" maxlength="3" placeholder="€">
+      </label>
+      <label>Default hourly rate
+        <input type="number" step="0.01" min="0" id="setDefaultRate" placeholder="20.00">
+      </label>
+      <label>Minimum gap between shifts before we warn you (hours)
+        <input type="number" step="0.5" min="0" id="setMinGap" placeholder="4">
+      </label>
+      <button type="submit" class="btn-primary">Save Settings</button>
+    </form>
+
+    <div class="section-header"><h2>Days Off</h2></div>
+    <div class="form" style="margin-bottom:14px;">
+      <div class="row2">
+        <input type="date" id="dayOffInput">
+        <button type="button" class="btn-secondary" id="addDayOffBtn">Add Day Off</button>
+      </div>
+    </div>
+    <div id="daysOffList" class="card-list chip-list empty">No days off marked.</div>
+
+    <div class="section-header"><h2>Cloud Sync</h2></div>
+    <p class="hint" id="cloudStatusText" style="margin-top:0;">Local mode — cloud sync not configured. See README.md to connect a free Supabase project.</p>
+    <button class="btn-secondary" id="signOutBtn2" hidden style="margin-bottom:14px;">Sign out</button>
+
+    <div class="section-header"><h2>Data</h2></div>
+    <div class="settings-actions">
+      <button class="btn-secondary" id="exportBtn">Export backup (.json)</button>
+      <label class="btn-secondary" for="importFile">Import backup (.json)</label>
+      <input type="file" id="importFile" accept="application/json" hidden>
+      <button class="btn-danger" id="resetBtn">Erase all data</button>
+    </div>
+    <p class="hint">MyShift — your data syncs to your account in the cloud when configured.</p>
+  </section>
+
+</main>
+
+<nav class="bottomnav">
+  <button class="navbtn active" data-view="dashboard">
+    <svg viewBox="0 0 24 24"><path d="M4 13h6V4H4v9zm0 7h6v-5H4v5zm10 0h6V11h-6v9zm0-16v5h6V4h-6z"/></svg>
+    <span>Dashboard</span>
+  </button>
+  <button class="navbtn" data-view="shifts">
+    <svg viewBox="0 0 24 24"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zM5 9h14v11H5V9z"/></svg>
+    <span>Shifts</span>
+  </button>
+  <button class="navbtn" data-view="open">
+    <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+    <span>Open</span>
+  </button>
+  <button class="navbtn" data-view="calendar">
+    <svg viewBox="0 0 24 24"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zM5 9h14v11H5V9zm2 2v2h2v-2H7zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z"/></svg>
+    <span>Calendar</span>
+  </button>
+  <button class="navbtn" data-view="payments">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm0 3v1h16V9H4zm12 5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+    <span>Pay</span>
+  </button>
+  <button class="navbtn" data-view="employers">
+    <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+    <span>Employers</span>
+  </button>
+  <button class="navbtn" data-view="settings">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.14 7.14 0 0 0 .06-.94 7.14 7.14 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.3 7.3 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.62-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.04.71 1.62.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7.3 7.3 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg>
+    <span>Settings</span>
+  </button>
+</nav>
+
+<!-- SHIFT MODAL -->
+<div class="modal" id="shiftModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="shiftModalTitle">Add Shift</h3>
+      <button class="modal-close" data-close="shiftModal">&times;</button>
+    </div>
+    <form id="shiftForm" class="form">
+      <input type="hidden" id="shiftId">
+      <label>Employer
+        <select id="shiftEmployer" required></select>
+      </label>
+      <label>Site
+        <select id="shiftSite" required></select>
+      </label>
+      <label>Date
+        <input type="date" id="shiftDate" required>
+      </label>
+      <div class="row2">
+        <label>Start time
+          <input type="time" id="shiftStart" required>
+        </label>
+        <label>Expected hours
+          <input type="number" id="shiftExpectedHours" min="0" step="0.25" required placeholder="8">
+        </label>
+      </div>
+      <label>Pay rate for this shift
+        <input type="number" step="0.01" min="0" id="shiftRate" placeholder="Leave blank to use site/employer/default rate">
+      </label>
+      <label>Expected pay date
+        <input type="date" id="shiftPayDate">
+      </label>
+      <div id="shiftStatusRow" class="pay-preview" hidden></div>
+      <label id="hoursWorkedWrap" hidden>Hours worked
+        <input type="number" id="shiftActualHours" min="0" step="0.25" placeholder="Fill in once the shift is done">
+      </label>
+      <label id="paidWrap" class="checkbox-row" hidden>
+        <input type="checkbox" id="shiftPaid">
+        Payment received
+      </label>
+      <label>Notes
+        <textarea id="shiftNotes" rows="2" placeholder="Optional"></textarea>
+      </label>
+      <div id="shiftPayPreview" class="pay-preview"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" id="deleteShiftBtn" hidden>Delete</button>
+        <button type="submit" class="btn-primary">Save Shift</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EMPLOYER MODAL -->
+<div class="modal" id="employerModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="employerModalTitle">Add Employer</h3>
+      <button class="modal-close" data-close="employerModal">&times;</button>
+    </div>
+    <form id="employerForm" class="form">
+      <input type="hidden" id="employerId">
+      <label>Employer name
+        <input type="text" id="employerName" required placeholder="e.g. Riverside Security">
+      </label>
+      <label>Contact
+        <input type="text" id="employerContact" placeholder="Name / phone">
+      </label>
+      <label>Default hourly rate
+        <input type="number" step="0.01" min="0" id="employerRate" placeholder="Leave blank to use app default rate">
+      </label>
+      <label>Notes
+        <textarea id="employerNotes" rows="2" placeholder="Optional"></textarea>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" id="deleteEmployerBtn" hidden>Delete</button>
+        <button type="submit" class="btn-primary">Save Employer</button>
+      </div>
+    </form>
+
+    <div class="section-header" id="employerSitesHeader" hidden><h2>Sites</h2></div>
+    <div id="employerSitesList" class="card-list empty" hidden></div>
+    <button type="button" class="btn-secondary" id="addSiteBtn" hidden style="margin-top:10px;">+ Add Site</button>
+  </div>
+</div>
+
+<!-- SITE MODAL (nested under an employer) -->
+<div class="modal" id="siteModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="siteModalTitle">Add Site</h3>
+      <button class="modal-close" data-close="siteModal">&times;</button>
+    </div>
+    <form id="siteForm" class="form">
+      <input type="hidden" id="siteId">
+      <input type="hidden" id="siteEmployerId">
+      <label>Site name
+        <input type="text" id="siteName" required placeholder="e.g. Downtown Branch">
+      </label>
+      <label>Address
+        <input type="text" id="siteAddress" placeholder="123 Main St">
+      </label>
+      <label>Navigation link
+        <input type="url" id="siteNavLink" placeholder="https://maps.google.com/...">
+      </label>
+      <label>Hourly rate override
+        <input type="number" step="0.01" min="0" id="siteRate" placeholder="Leave blank to use employer/default rate">
+      </label>
+      <label>Notes
+        <textarea id="siteNotes" rows="2" placeholder="Optional"></textarea>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" id="deleteSiteBtn" hidden>Delete</button>
+        <button type="submit" class="btn-primary">Save Site</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- OPEN SHIFT MODAL -->
+<div class="modal" id="openModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="openModalTitle">Check Open Shift</h3>
+      <button class="modal-close" data-close="openModal">&times;</button>
+    </div>
+    <form id="openForm" class="form">
+      <input type="hidden" id="openId">
+      <label>Employer
+        <select id="openEmployer" required></select>
+      </label>
+      <label>Site
+        <select id="openSite" required></select>
+      </label>
+      <label>Date
+        <input type="date" id="openDate" required>
+      </label>
+      <div class="row2">
+        <label>Start time
+          <input type="time" id="openStart" required>
+        </label>
+        <label>Expected hours
+          <input type="number" id="openExpectedHours" min="0" step="0.25" required placeholder="8">
+        </label>
+      </div>
+      <label>Pay rate for this shift
+        <input type="number" step="0.01" min="0" id="openRate" placeholder="Leave blank to use site/employer/default rate">
+      </label>
+      <label>Expected pay date
+        <input type="date" id="openPayDate">
+      </label>
+      <label>Notes
+        <textarea id="openNotes" rows="2" placeholder="Optional"></textarea>
+      </label>
+      <div id="openStatusPreview" class="status-preview"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" id="deleteOpenBtn" hidden>Remove</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DAY DETAIL MODAL -->
+<div class="modal" id="dayModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="dayModalTitle">Day</h3>
+      <button class="modal-close" data-close="dayModal">&times;</button>
+    </div>
+    <div id="dayModalStatus" class="pay-preview"></div>
+    <div id="dayModalList" class="card-list empty" style="margin-top:10px;"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button type="button" class="btn-secondary" id="dayToggleOffBtn">Mark as Day Off</button>
+      <button type="button" class="btn-primary" id="dayAddShiftBtn">+ Add Shift</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
