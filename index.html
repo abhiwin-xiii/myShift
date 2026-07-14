@@ -60,9 +60,18 @@
     <div id="upcomingList" class="card-list empty">No upcoming shifts yet.</div>
 
     <div class="section-header">
-      <h2>Recent Shifts</h2>
+      <h2>Calendar</h2>
+      <span id="dashCalTitle" class="dash-cal-title"></span>
     </div>
-    <div id="recentList" class="card-list empty">No shifts logged yet.</div>
+    <div class="cal-weekdays">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+    <div class="cal-grid" id="dashCalGrid"></div>
+    <div class="cal-legend">
+      <span><i class="cal-dot cal-dot-green"></i>Shift</span>
+      <span><i class="cal-dot cal-dot-orange"></i>Open candidate</span>
+      <span><i class="cal-dot cal-dot-red"></i>Day off</span>
+    </div>
 
     <button class="fab" id="fabAddShift">+</button>
   </section>
@@ -192,7 +201,6 @@
       <button class="btn-secondary" id="exportBtn">Export backup (.json)</button>
       <label class="btn-secondary" for="importFile">Import backup (.json)</label>
       <input type="file" id="importFile" accept="application/json" hidden>
-      <button class="btn-danger" id="resetBtn">Erase all data</button>
     </div>
     <p class="hint">MyShift — your data syncs to your account in the cloud when configured.</p>
   </section>

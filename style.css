@@ -80,9 +80,25 @@ html, body {
   margin: 22px 0 10px;
 }
 .section-header h2 { font-size: 15px; margin: 0; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.dash-cal-title { font-size: 13px; font-weight: 600; color: var(--text-dim); }
 
 .card-list { display: flex; flex-direction: column; gap: 10px; }
 .card-list.empty { color: var(--text-dim); font-size: 14px; padding: 18px; text-align: center; background: var(--surface); border-radius: var(--radius); border: 1px dashed var(--border); }
+
+.month-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 2px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.month-group-header:first-child { padding-top: 0; }
+.month-group-total { color: var(--accent-2); font-weight: 700; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.month-group-list { margin-bottom: 2px; }
 
 .item-card {
   background: var(--surface);

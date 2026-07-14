@@ -191,13 +191,16 @@
     return employer ? `${employer.name} — ${site.name}` : site.name;
   }
 
-  // Returns {start, end} as real Date objects. End = start + expected hours
+  // Returns {start, end} as real Date objects. End = start + duration
   // (naturally handles shifts that run past midnight since we add a duration, not a clock time).
+  // Once actual hours worked are filled in, those are used instead of the expected
+  // hours — so a shift that ran long correctly shows its real, longer end time.
   function shiftInterval(shift) {
     const [y, m, d] = shift.date.split("-").map(Number);
     const [sh, sm] = shift.start.split(":").map(Number);
     const start = new Date(y, m - 1, d, sh, sm);
-    const hrs = Number(shift.expectedHours) || 0;
+    const hasActual = shift.actualHours !== undefined && shift.actualHours !== null && shift.actualHours !== "";
+    const hrs = Number(hasActual ? shift.actualHours : shift.expectedHours) || 0;
     const end = new Date(start.getTime() + hrs * 3600000);
     return { start, end };
   }
@@ -253,6 +256,20 @@
 
     if (reasons.length === 0) reasons.push("No conflicts with your schedule.");
     return { status, reasons };
+  }
+
+  // Two committed shifts can never occupy the same time — you can't be in two
+  // places at once. Used to hard-block saving a shift (direct add/edit) that
+  // would overlap another one already on your schedule. excludeId lets an
+  // existing shift being edited skip comparing against itself.
+  function findOverlappingShift(cand, excludeId) {
+    if (!cand.date || !cand.start) return null;
+    const { start: cStart, end: cEnd } = shiftInterval(cand);
+    return data.shifts.find((s) => {
+      if (excludeId && s.id === excludeId) return false;
+      const { start: sStart, end: sEnd } = shiftInterval(s);
+      return cStart < sEnd && sStart < cEnd;
+    }) || null;
   }
 
   // Sum of pay for *not-yet-paid* shifts whose expected pay date falls within
@@ -343,6 +360,40 @@
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 1); // exclusive
     return { start, end };
+  }
+
+  // "YYYY-MM" grouping key for a shift's date, and a human label for that key.
+  function monthKey(dateStr) {
+    return dateStr.slice(0, 7);
+  }
+
+  function monthLabelFromKey(key) {
+    const [y, m] = key.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  }
+
+  // Stacks an already-sorted list of shifts into month sections (most recent
+  // month first), each with a header showing that month's shift count and total
+  // pay, then hands the shifts for that month to appendFn to render the cards.
+  function renderGroupedByMonth(container, shifts, appendFn) {
+    const groups = {};
+    shifts.forEach((s) => {
+      const key = monthKey(s.date);
+      (groups[key] = groups[key] || []).push(s);
+    });
+    Object.keys(groups).sort((a, b) => b.localeCompare(a)).forEach((key) => {
+      const monthShifts = groups[key];
+      let total = 0;
+      monthShifts.forEach((s) => { total += calcPay(s).pay; });
+      const header = document.createElement("div");
+      header.className = "month-group-header";
+      header.innerHTML = `<span>${monthLabelFromKey(key)}</span><span class="month-group-total">${fmtMoney(total)} · ${monthShifts.length} shift${monthShifts.length === 1 ? "" : "s"}</span>`;
+      container.appendChild(header);
+      const listWrap = document.createElement("div");
+      listWrap.className = "card-list month-group-list";
+      container.appendChild(listWrap);
+      appendFn(listWrap, monthShifts);
+    });
   }
 
   // Total projected pay for every shift dated this month, regardless of status —
@@ -451,10 +502,7 @@
       .slice(0, 5);
     renderShiftCards(document.getElementById("upcomingList"), upcoming, "No upcoming shifts yet.");
 
-    const recent = data.shifts.filter((s) => isPast(s))
-      .sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start))
-      .slice(0, 5);
-    renderShiftCards(document.getElementById("recentList"), recent, "No shifts logged yet.");
+    renderDashboardCalendar();
   }
 
   // ---------- Rendering: Payments ----------
@@ -543,7 +591,17 @@
       return;
     }
     container.classList.remove("empty");
-    list.forEach((s) => {
+    // Scheduled (upcoming) stays a flat, near-term list; Pending/Paid are
+    // historical, so stack them month-by-month with a per-month pay total.
+    if (filter === "scheduled") {
+      appendPaymentShiftCards(container, list, filter);
+    } else {
+      renderGroupedByMonth(container, list, (c, s) => appendPaymentShiftCards(c, s, filter));
+    }
+  }
+
+  function appendPaymentShiftCards(container, shifts, filter) {
+    shifts.forEach((s) => {
       const { pay } = calcPay(s);
       const card = document.createElement("div");
       card.className = "item-card open-card";
@@ -581,6 +639,10 @@
       return;
     }
     container.classList.remove("empty");
+    appendShiftCards(container, shifts);
+  }
+
+  function appendShiftCards(container, shifts) {
     shifts.forEach((s) => {
       const { pay } = calcPay(s);
       const onDayOff = isDayOff(s.date);
@@ -613,13 +675,28 @@
   });
 
   function renderShifts() {
+    const container = document.getElementById("shiftsList");
     let list = data.shifts.slice();
     if (shiftFilter === "upcoming") list = list.filter((s) => !isPast(s));
     if (shiftFilter === "past") list = list.filter((s) => isPast(s));
     list.sort((a, b) => shiftFilter === "past"
       ? (b.date + b.start).localeCompare(a.date + a.start)
       : (a.date + a.start).localeCompare(b.date + b.start));
-    renderShiftCards(document.getElementById("shiftsList"), list, "No shifts in this view.");
+
+    container.innerHTML = "";
+    if (list.length === 0) {
+      container.classList.add("empty");
+      container.textContent = "No shifts in this view.";
+      return;
+    }
+    container.classList.remove("empty");
+    // Past shifts are historical, so stack them month-by-month with a per-month
+    // pay total; Upcoming/All stay a flat, chronological list.
+    if (shiftFilter === "past") {
+      renderGroupedByMonth(container, list, appendShiftCards);
+    } else {
+      appendShiftCards(container, list);
+    }
   }
 
   // ---------- Rendering: Employers ----------
@@ -741,15 +818,6 @@
     e.target.value = "";
   });
 
-  document.getElementById("resetBtn").addEventListener("click", () => {
-    if (confirm("Erase all employers, sites and shifts? This cannot be undone.")) {
-      data = cloneDefault();
-      saveData();
-      toast("All data erased");
-      switchView("dashboard");
-    }
-  });
-
   // ---------- Shift Modal ----------
   const shiftModal = document.getElementById("shiftModal");
   const shiftForm = document.getElementById("shiftForm");
@@ -859,19 +927,28 @@
 
   function updatePayPreview() {
     const siteId = document.getElementById("shiftSite").value;
+    const date = document.getElementById("shiftDate").value;
     const start = document.getElementById("shiftStart").value;
     const expectedHours = document.getElementById("shiftExpectedHours").value;
     const el = document.getElementById("shiftPayPreview");
     updateHoursWorkedVisibility();
     if (!siteId || !start || !expectedHours) { el.textContent = "Fill in employer, site, start time, and expected hours to preview pay."; return; }
+    const id = document.getElementById("shiftId").value;
     const tmp = {
-      siteId, start,
+      siteId, date, start,
       expectedHours,
       rate: document.getElementById("shiftRate").value,
       actualHours: document.getElementById("shiftActualHours").value
     };
     const { pay, breakdown } = calcPay(tmp);
-    el.innerHTML = `Estimated pay: <strong>${fmtMoney(pay)}</strong><br>${breakdown}`;
+    let html = `Estimated pay: <strong>${fmtMoney(pay)}</strong><br>${breakdown}`;
+    if (date) {
+      const overlap = findOverlappingShift(tmp, id || null);
+      if (overlap) {
+        html += `<br><span style="color:var(--danger); font-weight:700;">Overlaps your shift at ${escapeHtml(siteLabel(overlap.siteId))} on ${dateLabel(overlap.date)} (${overlap.start}). This can't be saved until resolved.</span>`;
+      }
+    }
+    el.innerHTML = html;
   }
 
   ["shiftSite", "shiftDate", "shiftStart", "shiftExpectedHours", "shiftRate", "shiftActualHours", "shiftPaid"].forEach((id) => {
@@ -900,6 +977,11 @@
     };
     if (!payload.siteId) {
       alert("Choose a site for this shift (add one under the employer in the Employers tab if none exist yet).");
+      return;
+    }
+    const overlap = findOverlappingShift(payload, id || null);
+    if (overlap) {
+      alert(`This overlaps your shift at ${siteLabel(overlap.siteId)} on ${dateLabel(overlap.date)} (${overlap.start}). Two shifts can't cover the same time — adjust the time, or edit/delete the other shift first.`);
       return;
     }
     if (id) {
@@ -1144,9 +1226,10 @@
   function acceptOpenShift(id) {
     const cand = data.openShifts.find((c) => c.id === id);
     if (!cand) return;
-    const { status } = evaluateCandidate(cand);
+    const { status, reasons } = evaluateCandidate(cand);
     if (status === "red") {
-      if (!confirm("This overlaps with a shift you already have. Add it anyway?")) return;
+      alert("This overlaps a shift you already have — two shifts can't cover the same time. " + reasons.join(" "));
+      return;
     } else if (status === "amber") {
       if (!confirm("This has a tight turnaround or falls on a day off. Add it anyway?")) return;
     }
@@ -1284,29 +1367,34 @@
   let calYear = new Date().getFullYear();
   let calMonth = new Date().getMonth(); // 0-indexed
 
-  function renderCalendar() {
-    const grid = document.getElementById("calGrid");
-    const first = new Date(calYear, calMonth, 1);
-    document.getElementById("calTitle").textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  // Builds a month grid into any grid/title element pair. Shared by the
+  // navigable Calendar tab (calGrid/calTitle, any month) and the Dashboard's
+  // fixed at-a-glance widget (dashCalGrid/dashCalTitle, always the current month).
+  function renderCalendarGrid(gridId, titleId, year, month) {
+    const grid = document.getElementById(gridId);
+    const titleEl = document.getElementById(titleId);
+    if (!grid) return;
+    const first = new Date(year, month, 1);
+    if (titleEl) titleEl.textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
     const firstWeekday = (first.getDay() + 6) % 7; // 0=Mon .. 6=Sun
-    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
     const todayIso = todayStr();
     const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
 
     grid.innerHTML = "";
     for (let i = 0; i < totalCells; i++) {
       const dayNum = i - firstWeekday + 1;
-      let cellYear = calYear, cellMonth = calMonth, cellDay = dayNum, outside = false;
+      let cellYear = year, cellMonth = month, cellDay = dayNum, outside = false;
       if (dayNum < 1) {
         outside = true;
-        cellMonth = calMonth - 1;
+        cellMonth = month - 1;
         cellDay = daysInPrevMonth + dayNum;
         if (cellMonth < 0) { cellMonth = 11; cellYear -= 1; }
       } else if (dayNum > daysInMonth) {
         outside = true;
-        cellMonth = calMonth + 1;
+        cellMonth = month + 1;
         cellDay = dayNum - daysInMonth;
         if (cellMonth > 11) { cellMonth = 0; cellYear += 1; }
       }
@@ -1318,6 +1406,17 @@
       cell.addEventListener("click", () => openDayModal(iso));
       grid.appendChild(cell);
     }
+  }
+
+  function renderCalendar() {
+    renderCalendarGrid("calGrid", "calTitle", calYear, calMonth);
+  }
+
+  // Dashboard's calendar is intentionally fixed to today's month (no prev/next) —
+  // it's an at-a-glance widget; full navigation lives in the Calendar tab.
+  function renderDashboardCalendar() {
+    const now = new Date();
+    renderCalendarGrid("dashCalGrid", "dashCalTitle", now.getFullYear(), now.getMonth());
   }
 
   document.getElementById("calPrevBtn").addEventListener("click", () => {

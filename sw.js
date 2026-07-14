@@ -1,4 +1,4 @@
-const CACHE_NAME = "myshift-cache-v7";
+const CACHE_NAME = "myshift-cache-v11";
 const ASSETS = [
   "./",
   "./index.html",
